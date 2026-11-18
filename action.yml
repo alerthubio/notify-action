@@ -14,7 +14,7 @@ inputs:
     description: 'Your AlertHub API Key (X-API-KEY)'
     required: true
   title:
-    description: 'Alert headline (defaults to workflow name and job status)'
+    description: 'Alert headline (max 50 characters; auto-truncated if longer)'
     required: false
     default: ''
   body:
@@ -74,6 +74,13 @@ runs:
         PAYLOAD=$(python3 -c '
         import json, os
 
+	def clamp_title(text: str, max_bytes: int = 50):
+            encoded = text.encode("utf-8")
+            if len(encoded) <= max_bytes:
+                return text, False
+            trimmed = encoded[: max_bytes - 3].decode("utf-8", errors="ignore").rstrip()
+            return trimmed + "...", True
+
         job_status = os.environ.get("JOB_STATUS", "").lower()
         raw_status = os.environ.get("INPUT_STATUS", "auto").strip().lower()
         raw_priority = os.environ.get("INPUT_PRIORITY", "auto").strip().lower()
@@ -94,24 +101,30 @@ runs:
             priority = raw_priority
 
         repo = os.environ.get("GH_REPO", "")
+	repo_short = repo.split("/")[-1] if "/" in repo else repo
         workflow = os.environ.get("GH_WORKFLOW", "")
         branch = os.environ.get("GH_REF", "")
         sha = os.environ.get("GH_SHA", "")[:7]
         actor = os.environ.get("GH_ACTOR", "")
         run_url = os.environ.get("GH_RUN_URL", "")
 
-        title = os.environ.get("INPUT_TITLE", "").strip()
-        if not title:
+        raw_title = os.environ.get("INPUT_TITLE", "").strip()
+        if raw_title:
+            title, was_truncated = clamp_title(raw_title, 50)
+        else:
             label = job_status.upper() if job_status else status.upper()
-            title = f"[{label}] {workflow} in {repo}"
+            title, was_truncated = clamp_title(f"[{label}] {workflow} ({repo_short})", 50)
 
         body = os.environ.get("INPUT_BODY", "").strip()
         if not body:
             body = (
+		f"Workflow: {workflow}\n"
                 f"Repository: {repo} ({branch} @ {sha})\n"
                 f"Triggered by: {actor}\n"
                 f"Logs: {run_url}"
             )
+	elif was_truncated and raw_title:
+            body = f"{raw_title}\n\n{body}"
 
         data = {
             "title": title,
