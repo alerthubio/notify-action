@@ -1,0 +1,146 @@
+name: 'AlertHub Notify'
+description: 'Send instant CI/CD alerts to Mobile Push, Slack, Discord, Telegram, WhatsApp, and Email via AlertHub.'
+author: 'AlertHub'
+
+branding:
+  icon: 'bell'
+  color: 'purple'
+
+inputs:
+  user_id:
+    description: 'Your AlertHub User ID'
+    required: true
+  api_key:
+    description: 'Your AlertHub API Key (X-API-KEY)'
+    required: true
+  title:
+    description: 'Alert headline (defaults to workflow name and job status)'
+    required: false
+    default: ''
+  body:
+    description: 'Alert details (defaults to repo, branch, actor, and direct link to workflow logs)'
+    required: false
+    default: ''
+  status:
+    description: 'Event status: auto, info, success, warning, or error (auto maps from job.status)'
+    required: false
+    default: 'auto'
+  priority:
+    description: 'Alert priority: low, normal, or high (defaults to high on failure, normal otherwise)'
+    required: false
+    default: 'auto'
+  source:
+    description: 'Source identifier shown in AlertHub'
+    required: false
+    default: 'github-actions'
+  profile:
+    description: 'Optional AlertHub notification profile name'
+    required: false
+    default: ''
+  fail_on_error:
+    description: 'Fail the workflow step if the AlertHub API request fails (true/false)'
+    required: false
+    default: 'false'
+
+outputs:
+  http_status:
+    description: 'HTTP status code returned by the AlertHub API'
+    value: ${{ steps.dispatch.outputs.http_status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Dispatch AlertHub Notification
+      id: dispatch
+      shell: bash
+      env:
+        ALERTHUB_USER_ID: ${{ inputs.user_id }}
+        ALERTHUB_API_KEY: ${{ inputs.api_key }}
+        INPUT_TITLE: ${{ inputs.title }}
+        INPUT_BODY: ${{ inputs.body }}
+        INPUT_STATUS: ${{ inputs.status }}
+        INPUT_PRIORITY: ${{ inputs.priority }}
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        FAIL_ON_ERROR: ${{ inputs.fail_on_error }}
+        JOB_STATUS: ${{ job.status }}
+        GH_REPO: ${{ github.repository }}
+        GH_WORKFLOW: ${{ github.workflow }}
+        GH_REF: ${{ github.ref_name }}
+        GH_SHA: ${{ github.sha }}
+        GH_ACTOR: ${{ github.actor }}
+        GH_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        PAYLOAD=$(python3 -c '
+        import json, os
+
+        job_status = os.environ.get("JOB_STATUS", "").lower()
+        raw_status = os.environ.get("INPUT_STATUS", "auto").strip().lower()
+        raw_priority = os.environ.get("INPUT_PRIORITY", "auto").strip().lower()
+
+        if raw_status == "auto":
+            status_map = {
+                "success": "success",
+                "failure": "error",
+                "cancelled": "warning",
+            }
+            status = status_map.get(job_status, "info")
+        else:
+            status = raw_status
+
+        if raw_priority == "auto":
+            priority = "high" if status == "error" else "normal"
+        else:
+            priority = raw_priority
+
+        repo = os.environ.get("GH_REPO", "")
+        workflow = os.environ.get("GH_WORKFLOW", "")
+        branch = os.environ.get("GH_REF", "")
+        sha = os.environ.get("GH_SHA", "")[:7]
+        actor = os.environ.get("GH_ACTOR", "")
+        run_url = os.environ.get("GH_RUN_URL", "")
+
+        title = os.environ.get("INPUT_TITLE", "").strip()
+        if not title:
+            label = job_status.upper() if job_status else status.upper()
+            title = f"[{label}] {workflow} in {repo}"
+
+        body = os.environ.get("INPUT_BODY", "").strip()
+        if not body:
+            body = (
+                f"Repository: {repo} ({branch} @ {sha})\n"
+                f"Triggered by: {actor}\n"
+                f"Logs: {run_url}"
+            )
+
+        data = {
+            "title": title,
+            "body": body,
+            "status": status,
+            "priority": priority,
+            "source": os.environ.get("INPUT_SOURCE", "github-actions").strip() or "github-actions",
+        }
+
+        profile = os.environ.get("INPUT_PROFILE", "").strip()
+        if profile:
+            data["profile"] = profile
+
+        print(json.dumps(data))
+        ')
+
+        HTTP_STATUS=$(curl -sS -m 10 -o /tmp/alerthub_resp.txt -w "%{http_code}" \
+          -X POST "https://alerthub.io/api/event/${ALERTHUB_USER_ID}" \
+          -H "X-API-KEY: ${ALERTHUB_API_KEY}" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD" || echo "000")
+
+        echo "http_status=${HTTP_STATUS}" >> "$GITHUB_OUTPUT"
+
+        if [[ "$HTTP_STATUS" -ge 200 && "$HTTP_STATUS" -lt 300 ]]; then
+          echo "AlertHub notification dispatched (HTTP ${HTTP_STATUS})."
+        else
+          echo "::warning::AlertHub notification failed (HTTP ${HTTP_STATUS}): $(cat /tmp/alerthub_resp.txt 2>/dev/null)"
+          if [[ "${FAIL_ON_ERROR,,}" == "true" ]]; then
+            exit 1
+          fi
+        fi
