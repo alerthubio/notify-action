@@ -103,6 +103,21 @@ By default, a network hiccup reaching AlertHub logs a warning without failing yo
 - **Android App:** [Google Play Store](https://play.google.com/store/apps/details?id=io.alerthub.app)
 - **Community:** [r/alerthub](https://www.reddit.com/r/alerthub/) · [X (@AlertHubio)](https://x.com/AlertHubio)
 
+## Security & Version Pinning
+
+For standard setups, pin to the floating major version tag (`@v1`) to receive backwards-compatible bug fixes and updates automatically. For high-security or regulated environments, pin directly to the immutable 40-character commit SHA of a verified release:
+
+```yaml
+- name: Notify AlertHub
+  if: always()
+  uses: alerthubio/notify-action@2228059cd84805a510b1e6a24573324b18ae4746 # v1.0.0
+  with:
+    user_id: ${{ secrets.ALERTHUB_USER_ID }}
+    api_key: ${{ secrets.ALERTHUB_API_KEY }}
+```
+
+All official releases and tags in this repository are cryptographically signed and protected against unauthorized modification or force-pushes.
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
