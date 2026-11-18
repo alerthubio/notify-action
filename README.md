@@ -54,8 +54,8 @@ Route deployment notifications to a specific AlertHub notification profile with 
   with:
     user_id: ${{ secrets.ALERTHUB_USER_ID }}
     api_key: ${{ secrets.ALERTHUB_API_KEY }}
-    title: 'Deployed ${{ github.repository }} to production'
-    body: 'Commit ${{ github.sha }} rolled out cleanly by ${{ github.actor }}.'
+    title: 'Production deploy succeeded'
+    body: 'Deployed ${{ github.repository }} (${{ github.sha }}) by ${{ github.actor }}.'
     status: 'success'
     priority: 'normal'
     profile: 'default'
@@ -81,7 +81,7 @@ By default, a network hiccup reaching AlertHub logs a warning without failing yo
 | :--- | :--- | :--- | :--- |
 | `user_id` | **Yes** | — | Your AlertHub User ID. |
 | `api_key` | **Yes** | — | Your AlertHub API Key (`X-API-KEY`). |
-| `title` | No | *Auto-generated* | Custom alert headline. Defaults to `[STATUS] <workflow> in <repo>`. |
+| `title` | No | *Auto-generated* | Custom alert headline (max 50 characters; auto-truncated if longer). |
 | `body` | No | *Auto-generated* | Custom alert details. Defaults to repository, branch, short SHA, actor, and run URL. |
 | `status` | No | `'auto'` | Event status: `auto`, `info`, `success`, `warning`, or `error`. |
 | `priority` | No | `'auto'` | Alert priority: `auto` (`high` on `error`, `normal` otherwise), `low`, `normal`, or `high`. |
@@ -110,7 +110,7 @@ For standard setups, pin to the floating major version tag (`@v1`) to receive ba
 ```yaml
 - name: Notify AlertHub
   if: always()
-  uses: alerthubio/notify-action@2228059cd84805a510b1e6a24573324b18ae4746 # v1.0.0
+  uses: alerthubio/notify-action@072223d21e71d541d961b1e9a9b2046b7671a686 # v1.0.1
   with:
     user_id: ${{ secrets.ALERTHUB_USER_ID }}
     api_key: ${{ secrets.ALERTHUB_API_KEY }}
