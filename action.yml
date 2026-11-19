@@ -74,7 +74,7 @@ runs:
         PAYLOAD=$(python3 -c '
         import json, os
 
-	def clamp_title(text: str, max_bytes: int = 50):
+      def clamp_title(text: str, max_bytes: int = 50):
             encoded = text.encode("utf-8")
             if len(encoded) <= max_bytes:
                 return text, False
@@ -101,7 +101,7 @@ runs:
             priority = raw_priority
 
         repo = os.environ.get("GH_REPO", "")
-	repo_short = repo.split("/")[-1] if "/" in repo else repo
+        repo_short = repo.split("/")[-1] if "/" in repo else repo
         workflow = os.environ.get("GH_WORKFLOW", "")
         branch = os.environ.get("GH_REF", "")
         sha = os.environ.get("GH_SHA", "")[:7]
@@ -118,12 +118,12 @@ runs:
         body = os.environ.get("INPUT_BODY", "").strip()
         if not body:
             body = (
-		f"Workflow: {workflow}\n"
+                f"Workflow: {workflow}\n"
                 f"Repository: {repo} ({branch} @ {sha})\n"
                 f"Triggered by: {actor}\n"
                 f"Logs: {run_url}"
             )
-	elif was_truncated and raw_title:
+        elif was_truncated and raw_title:
             body = f"{raw_title}\n\n{body}"
 
         data = {
