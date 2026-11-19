@@ -74,7 +74,7 @@ runs:
         PAYLOAD=$(python3 -c '
         import json, os
 
-      def clamp_title(text: str, max_bytes: int = 50):
+        def clamp_title(text: str, max_bytes: int = 50):
             encoded = text.encode("utf-8")
             if len(encoded) <= max_bytes:
                 return text, False
